@@ -216,7 +216,7 @@ def put_an_x_in_it_node(root: Node) -> None:
     rand_node.left = None
     rand_node.right = None
 
-    return 
+    return rand_node
 
 
 def put_an_x_in_it(formula: str) -> str:
@@ -265,7 +265,7 @@ def initialize_pop(pop_size: int) -> Population:
     Example doctest:
     """
     pop: Population = []
-    for _ in pop_size:
+    for _ in range(pop_size):
         ind_str: str = gen_rand_prefix_code(2)
         pop.append(initialize_individual(ind_str, 0))
 
@@ -283,7 +283,27 @@ def recombine_pair(parent1: Individual, parent2: Individual) -> Population:
     Calls:          Basic python, random.choice-1, initialize_individual-2
     Example doctest:
     """
-    pass
+    p1_nodes: list[Node] = get_nodes(parent1["genome"])
+    p2_nodes: list[Node] = get_nodes(parent2["genome"])
+    
+    p1_node: Node = random.choice(p1_nodes)
+    p2_node: Node = random.choice(p2_nodes)
+
+    # TODO: Make one of these refernce the parent
+    # and the other reference p#_node above
+    p1_str: str = parse_tree_return(p1_node)
+    p2_str: str = parse_tree_return(p2_node)
+    p1_str_copy: str = parse_tree_return(p1_node)
+    p2_str_copy: str = parse_tree_return(p2_node)    
+
+    
+    
+    parse_tree_print(parent1["genome"])
+    print()
+    parse_tree_print(parent2["genome"])
+    print()
+
+    return [parent1, parent2]
 
 
 def recombine_group(parents: Population, recombine_rate: float) -> Population:
@@ -298,7 +318,15 @@ def recombine_group(parents: Population, recombine_rate: float) -> Population:
     Modifies:       Nothing
     Calls:          Basic python, random.random~n/2, recombine pair-n
     """
-    pass
+    children: Population = []
+    for p0, p1 in zip(parents[::2], parents[1::2]):
+        if random.random() < recombine_rate:
+            c0, c1 = recombine_pair(p0, p1)
+        else:
+            c0, c1 = p0, p1
+        children.extend([c0, c1])
+
+    return children
 
 
 def mutate_individual(parent: Individual, mutate_rate: float) -> Individual:
@@ -384,7 +412,11 @@ def evaluate_group(individuals: Population, io_data: IOdata) -> None:
     Calls:          Basic python, evaluate_individual-n
     Example doctest:
     """
-    pass
+    for ind in individuals:
+        if ind["fitness"] == 0:
+            evaluate_individual(ind, io_data)
+
+    return
 
 
 def rank_group(individuals: Population) -> None:
@@ -398,7 +430,9 @@ def rank_group(individuals: Population) -> None:
     Calls:          Basic python only
     Example doctest:
     """
-    pass
+    individuals.sort(key=lambda ind: ind["fitness"])
+
+    return
 
 
 def parent_select(individuals: Population, number: int) -> Population:
@@ -412,7 +446,10 @@ def parent_select(individuals: Population, number: int) -> Population:
     Calls:          Basic python, random.choices-1
     Example doctest:
     """
-    pass
+    parents: Population = []
+    fitnessen = [ind["fitness"] for ind in individuals]
+    parents = random.choices(individuals, fitnessen, k=number)
+    return parents
 
 
 def survivor_select(individuals: Population, pop_size: int) -> Population:
@@ -445,8 +482,18 @@ def evolve(io_data: IOdata, pop_size: int = 100) -> Population:
     # Type 's' to 'step' deeper
     # Type 'n' to 'next' over
     # Type 'f' or 'r' to finish/return a function call and go back to caller
-    population: Population = initialize_pop(pop_size)
+    recombine_rate: float = .8
+    mutate_rate: float = .1
     
+    population: Population = initialize_pop(pop_size)
+    evaluate_group(population, io_data)
+    rank_group(population)
+
+    while population[0]["fitness"] != 13.0:
+        parents: Population = parent_select(population, pop_size)        
+        children: Population = recombine_group(parents, recombine_rate)
+
+    return population
 
 
 # Seed for base grade.
