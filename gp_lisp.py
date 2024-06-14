@@ -107,6 +107,7 @@ def parse_expression(source_code: str) -> Node:
     source_code = source_code.replace("(", "")
     source_code = source_code.replace(")", "")
     code_arr = source_code.split()
+    code_arr_copy = source_code.split()
     return _parse_experession(code_arr)
 
 
@@ -211,6 +212,8 @@ def get_nodes(root: Node) -> list[Node]:
 def put_an_x_in_it_node(root: Node) -> None:
     node_list: list[Node] = get_nodes(root)
     rand_node: Node = random.choice(node_list)
+    while rand_node.data in OPERATORS:
+        rand_node = random.choice(node_list)
 
     rand_node.data = "x"
     rand_node.left = None
@@ -248,9 +251,7 @@ def gen_rand_prefix_code(depth_limit: int, rec_depth: int = 0) -> str:
             return str(random.randint(-100, 100))
     else:
         return str(random.randint(-100, 100))
-
-
-# <<<< DO NOT MODIFY
+ # <<<< DO NOT MODIFY
 
 
 def initialize_pop(pop_size: int) -> Population:
@@ -260,14 +261,15 @@ def initialize_pop(pop_size: int) -> Population:
     User Input:     no
     Prints:         no
     Returns:        a population, as a list of Individuals
-    Modifies:       Nothing
-    Calls:          random.choice-1, string.ascii_letters-1, initialize_individual-n
+         random.choice-1, string.ascii_letters-1, initialize_individual-n
     Example doctest:
     """
     pop: Population = []
     for _ in range(pop_size):
         ind_str: str = gen_rand_prefix_code(2)
-        pop.append(initialize_individual(ind_str, 0))
+        ind: Individual = initialize_individual(ind_str, 0)
+        put_an_x_in_it_node(ind["genome"])
+        pop.append(ind)
 
     return pop
 
@@ -287,7 +289,11 @@ def recombine_pair(parent1: Individual, parent2: Individual) -> Population:
     p2_nodes: list[Node] = get_nodes(parent2["genome"])
     
     select1_node: Node = random.choice(p1_nodes)
+    while select1_node.data in OPERATORS:
+        select1_node = random.choice(p1_nodes)
     select2_node: Node = random.choice(p2_nodes)
+    while select2_node.data in OPERATORS:
+        select2_node = random.choice(p2_nodes)
 
     p1_str: str = parse_tree_return(parent1["genome"])
     p2_str: str = parse_tree_return(parent2["genome"])
@@ -296,10 +302,18 @@ def recombine_pair(parent1: Individual, parent2: Individual) -> Population:
 
     c1_str: str = p1_str.replace(select1_str, select2_str)
     c2_str: str = p2_str.replace(select2_str, select1_str)
+
+    # fix the edge case where -(...) happens :/
+    c1_str = c1_str.replace("-(", "(")
+    c2_str = c2_str.replace("-(", "(")
     
     c1: Individual = initialize_individual(c1_str, 0.0)
     c2: Individual = initialize_individual(c2_str, 0.0)
 
+    if 'x' not in c1_str:
+        put_an_x_in_it_node(c1["genome"])
+    if 'x' not in c2_str:
+        put_an_x_in_it_node(c2["genome"])
     # parse_tree_print(c1["genome"])
     # print()
     # parse_tree_print(c2["genome"])
@@ -350,12 +364,17 @@ def mutate_individual(parent: Individual, mutate_rate: float) -> Individual:
 
         nodes: list[Node] = get_nodes(parent["genome"])
         node: Node = random.choice(nodes)
-        while node.data == "x":
+        while node.data in OPERATORS:
             node = random.choice(nodes)
 
-        node.data = str(random.randint(-100, 100))
-        node.left = None
-        node.right = None
+        # catch the chance where the only node is x
+        while node.data == "x" and len(nodes) > 1:
+            node = random.choice(nodes)
+
+        new_node: Node = parse_expression(gen_rand_prefix_code(1))
+        node.data = new_node.data
+        node.left = new_node.left
+        node.right = new_node.right
 
         # parse_tree_print(parent["genome"])
         # print()
@@ -549,8 +568,10 @@ def evolve(io_data: IOdata, pop_size: int = 100) -> Population:
         everyone: Population = population + mutants
         rank_group(everyone)
         population = survivor_select(everyone, pop_size)
+        # print(counter)
         if counter % 25 == 0:
-            print(population[0]["fitness"])
+            parse_tree_print(population[0]["genome"])
+            print()
         counter += 1
 
     return population
@@ -594,7 +615,7 @@ if __name__ == "__main__":
     # Yours
     train = data[: int(len(data) / 2)]
     test = data[int(len(data) / 2) :]
-    population = evolve(train)
+    population = evolve(train, 5)
     evaluate_individual(population[0], test)
     population[0]["fitness"]
 

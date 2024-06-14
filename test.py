@@ -6,6 +6,8 @@ def main() -> None:
     exp1_str: str = "( / ( - 90 x ) ( + 3 6 ) )"
     # exp1_node: Node = parse_expression(exp1_str)
     ind0 = initialize_individual(exp0_str, 0.0)
+    exp_bad_str: str = '( - -( * -46 x ) ( * -46 x ) )'
+    exp_bad_node: Node = parse_expression(exp_bad_str)
     # ind1 = initialize_individual(exp1_str, 0.0)
     # parse_tree_print(exp_node)
     # print()
@@ -23,7 +25,7 @@ def main() -> None:
     # print()
     # parse_tree_print(c1["genome"])
 
-    m1 = mutate_individual(ind0, 1.0)
+    # m1 = mutate_individual(ind0, 1.0)
 
     return
 
