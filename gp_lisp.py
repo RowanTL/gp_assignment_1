@@ -286,24 +286,26 @@ def recombine_pair(parent1: Individual, parent2: Individual) -> Population:
     p1_nodes: list[Node] = get_nodes(parent1["genome"])
     p2_nodes: list[Node] = get_nodes(parent2["genome"])
     
-    p1_node: Node = random.choice(p1_nodes)
-    p2_node: Node = random.choice(p2_nodes)
+    select1_node: Node = random.choice(p1_nodes)
+    select2_node: Node = random.choice(p2_nodes)
 
-    # TODO: Make one of these refernce the parent
-    # and the other reference p#_node above
-    p1_str: str = parse_tree_return(p1_node)
-    p2_str: str = parse_tree_return(p2_node)
-    p1_str_copy: str = parse_tree_return(p1_node)
-    p2_str_copy: str = parse_tree_return(p2_node)    
+    p1_str: str = parse_tree_return(parent1["genome"])
+    p2_str: str = parse_tree_return(parent2["genome"])
+    select1_str: str = parse_tree_return(select1_node)
+    select2_str: str = parse_tree_return(select2_node)    
 
+    c1_str: str = p1_str.replace(select1_str, select2_str)
+    c2_str: str = p2_str.replace(select2_str, select1_str)
     
-    
-    parse_tree_print(parent1["genome"])
-    print()
-    parse_tree_print(parent2["genome"])
-    print()
+    c1: Individual = initialize_individual(c1_str, 0.0)
+    c2: Individual = initialize_individual(c2_str, 0.0)
 
-    return [parent1, parent2]
+    # parse_tree_print(c1["genome"])
+    # print()
+    # parse_tree_print(c2["genome"])
+    # print()
+
+    return [c1, c2]
 
 
 def recombine_group(parents: Population, recombine_rate: float) -> Population:
@@ -340,7 +342,25 @@ def mutate_individual(parent: Individual, mutate_rate: float) -> Individual:
     Calls:          Basic python, random,choice-1,
     Example doctest:
     """
-    pass
+    # point mutation as want to keep the size of the
+    # individual small
+    if random.random() <= mutate_rate: 
+        # parse_tree_print(parent["genome"])
+        # print()
+
+        nodes: list[Node] = get_nodes(parent["genome"])
+        node: Node = random.choice(nodes)
+        while node.data == "x":
+            node = random.choice(nodes)
+
+        node.data = str(random.randint(-100, 100))
+        node.left = None
+        node.right = None
+
+        # parse_tree_print(parent["genome"])
+        # print()
+
+    return parent
 
 
 def mutate_group(children: Population, mutate_rate: float) -> Population:
@@ -354,7 +374,11 @@ def mutate_group(children: Population, mutate_rate: float) -> Population:
     Calls:          Basic python, mutate_individual-n
     Example doctest:
     """
-    pass
+    mutants: Population = []
+    for child in children:
+        mutants.append(mutate_individual(child, mutate_rate))
+
+    return mutants
 
 
 # DO NOT MODIFY >>>>
@@ -416,6 +440,14 @@ def evaluate_group(individuals: Population, io_data: IOdata) -> None:
         if ind["fitness"] == 0:
             evaluate_individual(ind, io_data)
 
+    # remove the math.infs
+    pruned_inds: Population = []
+    for ind in individuals:
+        if ind["fitness"] != math.inf or ind["fitness"] != -math.inf:
+            pruned_inds.append(ind)
+
+    individuals = pruned_inds
+
     return
 
 
@@ -463,7 +495,26 @@ def survivor_select(individuals: Population, pop_size: int) -> Population:
     Calls:          Basic python only
     Example doctest:
     """
-    pass
+    q: int = 10
+    win_amt: dict[int, int] = {}  # individual index : win amount
+    for ind_index in range(len(individuals)):
+        ind_fit = individuals[ind_index]["fitness"]
+        for _ in range(q):
+            rand_index: int = random.randrange(len(individuals))
+            rand_fit = individuals[rand_index]["fitness"]
+            if ind_fit >= rand_fit:
+                if ind_index not in win_amt:
+                    win_amt[ind_index] = 0
+                win_amt[ind_index] += 1
+
+    return_pop: Population = []
+    win_sorted: dict[int, int] = {
+        k: v for k, v in sorted(win_amt.items(), key=lambda item: item[1])
+    }
+    for ind_index, win_amt in win_sorted.items():
+        return_pop.append(individuals[ind_index])
+
+    return return_pop[:pop_size]
 
 
 def evolve(io_data: IOdata, pop_size: int = 100) -> Population:
@@ -483,7 +534,8 @@ def evolve(io_data: IOdata, pop_size: int = 100) -> Population:
     # Type 'n' to 'next' over
     # Type 'f' or 'r' to finish/return a function call and go back to caller
     recombine_rate: float = .8
-    mutate_rate: float = .1
+    mutate_rate: float = .03
+    counter: int = 0
     
     population: Population = initialize_pop(pop_size)
     evaluate_group(population, io_data)
@@ -492,6 +544,14 @@ def evolve(io_data: IOdata, pop_size: int = 100) -> Population:
     while population[0]["fitness"] != 13.0:
         parents: Population = parent_select(population, pop_size)        
         children: Population = recombine_group(parents, recombine_rate)
+        mutants: Population = mutate_group(children, mutate_rate)
+        evaluate_group(mutants, io_data)
+        everyone: Population = population + mutants
+        rank_group(everyone)
+        population = survivor_select(everyone, pop_size)
+        if counter % 25 == 0:
+            print(population[0]["fitness"])
+        counter += 1
 
     return population
 
