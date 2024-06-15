@@ -107,7 +107,7 @@ def parse_expression(source_code: str) -> Node:
     source_code = source_code.replace("(", "")
     source_code = source_code.replace(")", "")
     code_arr = source_code.split()
-    code_arr_copy = source_code.split()
+    # code_arr_copy = source_code.split()
     return _parse_experession(code_arr)
 
 
@@ -266,7 +266,7 @@ def initialize_pop(pop_size: int) -> Population:
     """
     pop: Population = []
     for _ in range(pop_size):
-        ind_str: str = gen_rand_prefix_code(2)
+        ind_str: str = gen_rand_prefix_code(3)
         ind: Individual = initialize_individual(ind_str, 0)
         put_an_x_in_it_node(ind["genome"])
         pop.append(ind)
@@ -306,6 +306,11 @@ def recombine_pair(parent1: Individual, parent2: Individual) -> Population:
     # fix the edge case where -(...) happens :/
     c1_str = c1_str.replace("-(", "(")
     c2_str = c2_str.replace("-(", "(")
+    
+    if c1_str == '( + ( + ( + ( / x ( * -37 -x1 ) ) ( * x x ) ) ( / x ( / 9x ( * ( + x x ) x ) ) ) ) x )':
+        pass
+    if c2_str == '( + ( + ( + ( / x ( * -37 -x1 ) ) ( * x x ) ) ( / x ( / 9x ( * ( + x x ) x ) ) ) ) x )':
+        pass
     
     c1: Individual = initialize_individual(c1_str, 0.0)
     c2: Individual = initialize_individual(c2_str, 0.0)
@@ -356,8 +361,6 @@ def mutate_individual(parent: Individual, mutate_rate: float) -> Individual:
     Calls:          Basic python, random,choice-1,
     Example doctest:
     """
-    # point mutation as want to keep the size of the
-    # individual small
     if random.random() <= mutate_rate: 
         # parse_tree_print(parent["genome"])
         # print()
@@ -371,7 +374,11 @@ def mutate_individual(parent: Individual, mutate_rate: float) -> Individual:
         while node.data == "x" and len(nodes) > 1:
             node = random.choice(nodes)
 
-        new_node: Node = parse_expression(gen_rand_prefix_code(1))
+        new_node: Node = parse_expression(gen_rand_prefix_code(2))
+
+        # write a function that does this and
+        # assign them subnodes data too.
+        # I think this doesn't work in my head
         node.data = new_node.data
         node.left = new_node.left
         node.right = new_node.right
@@ -460,12 +467,12 @@ def evaluate_group(individuals: Population, io_data: IOdata) -> None:
             evaluate_individual(ind, io_data)
 
     # remove the math.infs
-    pruned_inds: Population = []
-    for ind in individuals:
-        if ind["fitness"] != math.inf or ind["fitness"] != -math.inf:
-            pruned_inds.append(ind)
-
-    individuals = pruned_inds
+    n: int = 0
+    while n < len(individuals):
+        if individuals[n]["fitness"] in (math.inf, -math.inf):
+            individuals.pop(n)
+            n -= 1
+        n += 1
 
     return
 
@@ -481,7 +488,7 @@ def rank_group(individuals: Population) -> None:
     Calls:          Basic python only
     Example doctest:
     """
-    individuals.sort(key=lambda ind: ind["fitness"])
+    individuals.sort(key=lambda ind: ind["fitness"]) 
 
     return
 
@@ -571,6 +578,7 @@ def evolve(io_data: IOdata, pop_size: int = 100) -> Population:
         # print(counter)
         if counter % 25 == 0:
             parse_tree_print(population[0]["genome"])
+            print(f" {population[0]["fitness"]}")
             print()
         counter += 1
 
