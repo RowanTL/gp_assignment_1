@@ -37,6 +37,8 @@ import math
 # Is there any modularity in adjacency?
 # What mechanisms capitalize on such modular patterns?
 OPERATORS = "+-/*"
+NUMS = list(range(-100, 101, 1))
+POP_SIZE = 200
 
 
 class Node:
@@ -240,6 +242,7 @@ def gen_rand_prefix_code(depth_limit: int, rec_depth: int = 0) -> str:
     rec_depth += 1
     if rec_depth < depth_limit:
         if random.random() < 0.9:
+        # if random.random() <= 1.00:  # this always happens yes
             return (
                 random.choice(OPERATORS)
                 + " "
@@ -289,27 +292,34 @@ def recombine_pair(parent1: Individual, parent2: Individual) -> Population:
     p2_nodes: list[Node] = get_nodes(parent2["genome"])
     
     select1_node: Node = random.choice(p1_nodes)
-    while select1_node.data in OPERATORS:
+    while select1_node.data not in OPERATORS:
         select1_node = random.choice(p1_nodes)
     select2_node: Node = random.choice(p2_nodes)
-    while select2_node.data in OPERATORS:
+    while select2_node.data not in OPERATORS:
         select2_node = random.choice(p2_nodes)
 
     p1_str: str = parse_tree_return(parent1["genome"])
     p2_str: str = parse_tree_return(parent2["genome"])
-    select1_str: str = parse_tree_return(select1_node)
-    select2_str: str = parse_tree_return(select2_node)    
+    if p1_str == "( + ( - -32 -64 ) ( + 13 x ) )":
+        pass
+    select1_str: str = " " + parse_tree_return(select1_node) + " "
+    select2_str: str = " " + parse_tree_return(select2_node) + " "
 
     c1_str: str = p1_str.replace(select1_str, select2_str)
     c2_str: str = p2_str.replace(select2_str, select1_str)
+
+    # try this for the fun of it and pray
+    # replace every x with a constant
+    c1_str = c1_str.replace("x", str(random.choice(NUMS)))
+    c2_str = c2_str.replace("x", str(random.choice(NUMS)))
 
     # fix the edge case where -(...) happens :/
     c1_str = c1_str.replace("-(", "(")
     c2_str = c2_str.replace("-(", "(")
     
-    if c1_str == '( + ( + ( + ( / x ( * -37 -x1 ) ) ( * x x ) ) ( / x ( / 9x ( * ( + x x ) x ) ) ) ) x )':
+    if c1_str == "( + ( + 13 x ) ( + 13 x ) )":
         pass
-    if c2_str == '( + ( + ( + ( / x ( * -37 -x1 ) ) ( * x x ) ) ( / x ( / 9x ( * ( + x x ) x ) ) ) ) x )':
+    if c2_str == "( + ( + 13 x ) ( + 13 x ) )":
         pass
     
     c1: Individual = initialize_individual(c1_str, 0.0)
@@ -361,31 +371,12 @@ def mutate_individual(parent: Individual, mutate_rate: float) -> Individual:
     Calls:          Basic python, random,choice-1,
     Example doctest:
     """
-    if random.random() <= mutate_rate: 
-        # parse_tree_print(parent["genome"])
-        # print()
-
-        nodes: list[Node] = get_nodes(parent["genome"])
-        node: Node = random.choice(nodes)
-        while node.data in OPERATORS:
-            node = random.choice(nodes)
-
-        # catch the chance where the only node is x
-        while node.data == "x" and len(nodes) > 1:
-            node = random.choice(nodes)
-
-        new_node: Node = parse_expression(gen_rand_prefix_code(2))
-
-        # write a function that does this and
-        # assign them subnodes data too.
-        # I think this doesn't work in my head
-        node.data = new_node.data
-        node.left = new_node.left
-        node.right = new_node.right
-
-        # parse_tree_print(parent["genome"])
-        # print()
-
+    if random.random() <= mutate_rate:         
+        new_prefix: str = gen_rand_prefix_code(2)
+        temp_parent: Individual = initialize_individual(new_prefix, 0.0)
+        child, _ = recombine_pair(parent, temp_parent)
+        parent = child
+            
     return parent
 
 
@@ -505,8 +496,11 @@ def parent_select(individuals: Population, number: int) -> Population:
     Example doctest:
     """
     parents: Population = []
-    fitnessen = [ind["fitness"] for ind in individuals]
-    parents = random.choices(individuals, fitnessen, k=number)
+    fitnessen: list[float] = [ind["fitness"] for ind in individuals]
+    fitness_max: int = max(fitnessen)
+    adj_fitnessen: list[float] = list(map(lambda num: (fitness_max - num + .00000001), fitnessen))
+    parents = random.choices(individuals, adj_fitnessen, k=number)
+    # parents = random.choices(individuals, k=number)
     return parents
 
 
@@ -521,6 +515,7 @@ def survivor_select(individuals: Population, pop_size: int) -> Population:
     Calls:          Basic python only
     Example doctest:
     """
+    # tournament style elimination
     q: int = 10
     win_amt: dict[int, int] = {}  # individual index : win amount
     for ind_index in range(len(individuals)):
@@ -528,14 +523,14 @@ def survivor_select(individuals: Population, pop_size: int) -> Population:
         for _ in range(q):
             rand_index: int = random.randrange(len(individuals))
             rand_fit = individuals[rand_index]["fitness"]
-            if ind_fit >= rand_fit:
+            if ind_fit <= rand_fit:
                 if ind_index not in win_amt:
                     win_amt[ind_index] = 0
                 win_amt[ind_index] += 1
 
     return_pop: Population = []
     win_sorted: dict[int, int] = {
-        k: v for k, v in sorted(win_amt.items(), key=lambda item: item[1])
+        k: v for k, v in sorted(win_amt.items(), key=lambda item: item[1], reverse=True)
     }
     for ind_index, win_amt in win_sorted.items():
         return_pop.append(individuals[ind_index])
@@ -560,7 +555,7 @@ def evolve(io_data: IOdata, pop_size: int = 100) -> Population:
     # Type 'n' to 'next' over
     # Type 'f' or 'r' to finish/return a function call and go back to caller
     recombine_rate: float = .8
-    mutate_rate: float = .03
+    mutate_rate: float = .1
     counter: int = 0
     
     population: Population = initialize_pop(pop_size)
@@ -578,8 +573,8 @@ def evolve(io_data: IOdata, pop_size: int = 100) -> Population:
         # print(counter)
         if counter % 25 == 0:
             parse_tree_print(population[0]["genome"])
-            print(f" {population[0]["fitness"]}")
-            print()
+            print(f" {population[0]["fitness"]} {counter}")
+            # print()
         counter += 1
 
     return population
@@ -623,7 +618,7 @@ if __name__ == "__main__":
     # Yours
     train = data[: int(len(data) / 2)]
     test = data[int(len(data) / 2) :]
-    population = evolve(train, 5)
+    population = evolve(train, POP_SIZE)
     evaluate_individual(population[0], test)
     population[0]["fitness"]
 
